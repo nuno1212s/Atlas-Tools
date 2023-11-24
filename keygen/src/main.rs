@@ -94,19 +94,18 @@ fn main() {
         let config = &config;
 
         for replica_id in config.ranges.start_replica..config.ranges.start_replica + config.ranges.replica_count {
-            scope.execute(move || {generate_key_for(config, replica_id)});
+            scope.execute(move || { generate_key_for(config, config.output_dir.join(format!("{:?}/", replica_id)), replica_id) });
         }
 
         for client_id in config.ranges.start_client..config.ranges.start_client + config.ranges.client_count {
-            scope.execute(move || {generate_key_for(config, client_id)});
+            scope.execute(move || { generate_key_for(config, config.output_dir.join(format!("{:?}/", client_id)), client_id) });
         }
     });
 
     println!("Generated all keys");
 }
 
-fn generate_key_for(config: &KeyGenConfig, id: usize) {
-
+fn generate_key_for(config: &KeyGenConfig, output_dir: PathBuf, id: usize) {
     match &config.generator {
         Generator::Ecdsa { curve } => {
             let KeyNames {
@@ -114,8 +113,8 @@ fn generate_key_for(config: &KeyGenConfig, id: usize) {
             } = key_names("ecdsa", &format!("{:?}", curve), id);
 
             generators::ecdsa::generate_ecdsa(
-                &config.output_dir.join(private),
-                &config.output_dir.join(public),
+                &output_dir.join(private),
+                &output_dir.join(public),
                 curve,
             ).expect("Failed to generate ecdsa keys");
         }
@@ -126,16 +125,16 @@ fn generate_key_for(config: &KeyGenConfig, id: usize) {
                 cert,
             } = key_names("ed", "25519", id);
             generators::ed25519::generate_ed25519(
-                &config.output_dir.join(&priv_file),
-                &config.output_dir.join(pub_file),
+                &output_dir.join(&priv_file),
+                &output_dir.join(pub_file),
             ).expect("generate ed");
 
             if config.gen_certs {
                 generate_x509(
                     &config.generator,
                     format!("atlas{id}"),
-                    &config.output_dir.join(&priv_file),
-                    &config.output_dir.join(cert),
+                    &output_dir.join(&priv_file),
+                    &output_dir.join(cert),
                 )
             }
         }

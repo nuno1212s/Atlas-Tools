@@ -1,0 +1,11 @@
+worker_count = 8
+
+[tcp_conns]
+replica_concurrent_connections = 4
+client_concurrent_connection = 2
+
+[client_pool_config]
+batch_size = 1024
+clients_per_pool = 1000
+batch_timeout_micros = 100
+batch_sleep_micros = 100
