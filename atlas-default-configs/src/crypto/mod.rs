@@ -17,7 +17,7 @@ pub fn read_pk_of(node: &NodeId) -> Result<PublicKey> {
     todo!()
 }
 
-fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
+pub fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
@@ -44,7 +44,7 @@ fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificat
 }
 
 #[inline]
-fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
+pub fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
@@ -68,11 +68,11 @@ fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
 }
 
 #[inline]
-fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
+pub fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
     read_private_keys_from_file(file).pop().unwrap()
 }
 
-fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
+pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
     let id = usize::from(id);
     let mut root_store = RootCertStore::empty();
 
@@ -124,7 +124,7 @@ fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
     cfg
 }
 
-fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
+pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     let id = usize::from(id);
     let mut root_store = RootCertStore::empty();
 
@@ -176,7 +176,7 @@ fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     cfg
 }
 
-fn get_client_config(id: NodeId) -> ClientConfig {
+pub fn get_client_config(id: NodeId) -> ClientConfig {
     let id = usize::from(id);
 
     let mut root_store = RootCertStore::empty();
@@ -224,7 +224,7 @@ fn get_client_config(id: NodeId) -> ClientConfig {
     cfg
 }
 
-fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
+pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
     let id = usize::from(id);
 
     let mut root_store = RootCertStore::empty();

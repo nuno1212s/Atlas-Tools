@@ -1,6 +1,7 @@
 use config::{Config, Source};
 use serde::Deserialize;
 use atlas_common::error::*;
+use atlas_common::node_id::NodeType;
 use atlas_communication::config::MioConfig;
 
 /// The node configuration should contain this information
@@ -10,11 +11,12 @@ pub struct Node {
     pub ip: String,
     pub port: u16,
     pub hostname: String,
+    pub node_type: NodeType,
 }
 
 /// Configuration about the node
 #[derive(Deserialize, Clone, Debug)]
-pub struct NodeConfig {
+pub struct ReconfigurationConfig {
     pub own_node: Node,
     pub bootstrap_nodes: Vec<Node>,
 }
@@ -49,17 +51,19 @@ pub struct NetworkConfig {
     pub tcp_conns: TCPConnConfig,
 }
 
-pub fn read_node_config<T>(source: T) -> Result<NodeConfig> {
+pub fn read_node_config<T>(source: T) -> Result<ReconfigurationConfig>
+    where T: Source + Sync + Send + 'static {
+
     let settings = Config::builder()
         .add_source(source)
         .build()?;
 
-    let node_config: NodeConfig = settings.try_deserialize()?;
+    let node_config: ReconfigurationConfig = settings.try_deserialize()?;
 
     Ok(node_config)
 }
 
-pub fn get_network_config<T>(source: T) -> Result<MioConfig>
+pub fn get_network_config<T>(source: T) -> Result<NetworkConfig>
     where T: Source + Send + Sync + 'static {
     let config = Config::builder()
         .add_source(source)
@@ -67,11 +71,5 @@ pub fn get_network_config<T>(source: T) -> Result<MioConfig>
 
     let network: NetworkConfig = config.try_deserialize()?;
 
-    Ok(MioConfig::from(network))
-}
-
-impl From<NetworkConfig> for MioConfig {
-    fn from(value: NetworkConfig) -> Self {
-        todo!()
-    }
+    Ok(network)
 }

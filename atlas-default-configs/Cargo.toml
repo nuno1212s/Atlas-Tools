@@ -10,9 +10,9 @@ anyhow = "1.0.75"
 thiserror = "1.0.50"
 
 serde = { version = "1", features = ["derive"] }
-atlas-common = { path = "../../Atlas/Atlas-Common" }
-atlas-communication = { path = "../../Atlas/Atlas-Communication" }
-atlas-reconfiguration = { path = "../../Atlas/Atlas-Reconfiguration" }
+atlas-common = { path = "../../Atlas/Atlas-Common", features = ["serialize_serde"]}
+atlas-communication = { path = "../../Atlas/Atlas-Communication", features = ["serialize_serde"]}
+atlas-reconfiguration = { path = "../../Atlas/Atlas-Reconfiguration", features = ["serialize_serde"] }
 rustls = "0.21"
 rustls-pemfile = "1"
 config = "0.13.4"
