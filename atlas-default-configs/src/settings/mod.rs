@@ -2,7 +2,6 @@ use config::{Config, Source};
 use serde::Deserialize;
 use atlas_common::error::*;
 use atlas_common::node_id::NodeType;
-use atlas_communication::config::MioConfig;
 
 /// The node configuration should contain this information
 #[derive(Deserialize, Clone, Debug)]
@@ -24,15 +23,32 @@ pub struct ReconfigurationConfig {
 #[derive(Deserialize, Clone, Debug)]
 pub struct PoolConfig {
     ///The max size for batches of client operations
-    pub batch_size: usize,
+    pub batch_limit: usize,
     ///How many clients should be placed in a single collecting pool (seen in incoming_peer_handling)
     pub clients_per_pool: usize,
+    /// The size of the request queue for each client
+    pub per_client_bound: usize,
     ///The timeout for batch collection in each client pool.
     /// (The first to reach between batch size and timeout)
     pub batch_timeout_micros: u64,
     ///How long should a client pool sleep for before attempting to collect requests again
     /// (It actually will sleep between 3/4 and 5/4 of this value, to make sure they don't all sleep / wake up at the same time)
     pub batch_sleep_micros: u64,
+    
+    pub channel_size: usize
+}
+
+impl From<PoolConfig> for atlas_communication::config::ClientPoolConfig {
+    fn from(config: PoolConfig) -> Self {
+        atlas_communication::config::ClientPoolConfig::new(
+            config.batch_limit,
+            config.per_client_bound,
+            config.clients_per_pool,
+            config.batch_timeout_micros,
+            config.batch_sleep_micros,
+            config.channel_size,
+        )
+    }
 }
 
 #[derive(Deserialize, Clone, Debug)]

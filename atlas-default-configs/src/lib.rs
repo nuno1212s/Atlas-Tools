@@ -1,17 +1,20 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use config::File;
 use config::FileFormat::Toml;
+use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::node_id::NodeId;
 use atlas_common::error::*;
 use atlas_common::peer_addr::PeerAddr;
-use atlas_communication::config::{ClientPoolConfig, MioConfig, TcpConfig, TlsConfig};
+use atlas_communication::config::{ClientPoolConfig};
+use atlas_communication::reconfiguration::NodeInfo;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
-use atlas_reconfiguration::message::NodeTriple;
+
 use crate::crypto::{get_client_config, get_client_config_replica, get_server_config_replica, get_tls_sync_server_config, read_own_keypair, read_pk_of};
-use crate::settings::{get_network_config, NetworkConfig, ReconfigurationConfig, read_node_config};
+use crate::settings::{get_network_config, NetworkConfig, ReconfigurationConfig, read_node_config, PoolConfig};
 
 pub mod crypto;
 pub mod settings;
+
 
 pub fn get_tls_config(id: NodeId) -> TlsConfig {
     let client_config = get_client_config(id);
@@ -27,7 +30,7 @@ pub fn get_tls_config(id: NodeId) -> TlsConfig {
     }
 }
 
-pub fn get_mio_config(id: NodeId) -> Result<MioConfig> {
+pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolConfig)> {
     let tls_config = get_tls_config(id);
 
     let network = get_network_config(File::new("config/network.toml", Toml))?;
@@ -40,20 +43,10 @@ pub fn get_mio_config(id: NodeId) -> Result<MioConfig> {
         client_concurrent_connections: tcp_conns.client_concurrent_connections,
     };
 
-    let client_pool = ClientPoolConfig {
-        batch_size: pool_config.batch_size,
-        clients_per_pool: pool_config.clients_per_pool,
-        batch_timeout_micros: pool_config.batch_timeout_micros,
-        batch_sleep_micros: pool_config.batch_sleep_micros,
-    };
-
-    Ok(MioConfig {
-        node_config: atlas_communication::config::NodeConfig {
-            tcp_config,
-            client_pool_config: client_pool,
-        },
-        worker_count,
-    })
+    Ok((MIOConfig {
+        epoll_worker_count: worker_count as u32,
+        tcp_configs: tcp_config,
+    }, pool_config.into()))
 }
 
 pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
@@ -72,11 +65,11 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
     for node in bootstrap_nodes {
         let node_id = NodeId(node.node_id);
 
-        known_nodes.push(NodeTriple::new(
+        known_nodes.push(NodeInfo::new(
             node_id,
-            read_pk_of(&node_id)?.pk_bytes().to_vec(),
+            node.node_type,
+            read_pk_of(&node_id)?,
             PeerAddr::new(SocketAddr::V4(SocketAddrV4::new(node.ip.parse::<Ipv4Addr>()?, node.port)), node.hostname),
-            node.node_type
         ));
     }
 

@@ -2,11 +2,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::iter;
 use std::sync::Arc;
-use rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore, ServerConfig};
-use rustls::server::AllowAnyAuthenticatedClient;
-use rustls_pemfile::{Item, read_one};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use anyhow::Result;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls_pemfile::{Item, read_one};
 use atlas_common::node_id::NodeId;
 
 pub fn read_own_keypair(node: &NodeId) -> Result<KeyPair> {
@@ -17,22 +17,13 @@ pub fn read_pk_of(node: &NodeId) -> Result<PublicKey> {
     todo!()
 }
 
-pub fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificate> {
+fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<CertificateDer<'static>> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
             Item::X509Certificate(cert) => {
-                certs.push(Certificate(cert));
-            }
-            Item::RSAKey(_) => {
-                panic!("Key given in place of a certificate")
-            }
-            Item::PKCS8Key(_) => {
-                panic!("Key given in place of a certificate")
-            }
-            Item::ECKey(_) => {
-                panic!("Key given in place of a certificate")
+                certs.push(cert);
             }
             _ => {
                 panic!("Key given in place of a certificate")
@@ -44,22 +35,22 @@ pub fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certif
 }
 
 #[inline]
-pub fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey> {
+fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKeyDer<'static>> {
     let mut certs = Vec::new();
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
-            Item::RSAKey(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Pkcs1Key(rsa) => {
+                certs.push(PrivateKeyDer::Pkcs1(rsa))
             }
-            Item::PKCS8Key(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Pkcs8Key(rsa) => {
+                certs.push(PrivateKeyDer::Pkcs8(rsa))
             }
-            Item::ECKey(rsa) => {
-                certs.push(PrivateKey(rsa))
+            Item::Sec1Key(rsa) => {
+                certs.push(PrivateKeyDer::Sec1(rsa))
             }
             _ => {
-                panic!("Key given in place of a certificate")
+                panic!("Certificate given in place of a key")
             }
         }
     }
@@ -68,7 +59,7 @@ pub fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKey>
 }
 
 #[inline]
-pub fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKey {
+fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKeyDer<'static> {
     read_private_keys_from_file(file).pop().unwrap()
 }
 
@@ -82,7 +73,7 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
 
         let certs = read_certificates_from_file(&mut file);
 
-        root_store.add(&certs[0]).expect("Failed to put root store");
+        root_store.add(certs[0].clone()).expect("Failed to put root store");
 
         certs
     };
@@ -112,15 +103,11 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
     };
 
     // create server conf
-    let auth = AllowAnyAuthenticatedClient::new(root_store);
     let cfg = ServerConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()
-        .unwrap()
-        .with_client_cert_verifier(Arc::new(auth))
+        .with_no_client_auth()
         .with_single_cert(chain, sk)
-        .expect("Failed to make cfg");
+        .expect("Failed to make server config for TLS");
+
     cfg
 }
 
@@ -135,8 +122,8 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
         read_certificates_from_file(&mut file)
     };
 
-    root_store.add(&certs[0]).unwrap();
-
+    root_store.add(certs[0].clone()).unwrap();
+    
     // configure our cert chain and secret key
     let sk = {
         let mut file = if id < 1000 {
@@ -161,15 +148,10 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
         c
     };
 
-    // create server conf
-    let auth = AllowAnyAuthenticatedClient::new(root_store);
 
+    // create server conf
     let cfg = ServerConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()
-        .unwrap()
-        .with_client_cert_verifier(Arc::new(auth))
+        .with_no_client_auth()
         .with_single_cert(chain, sk)
         .expect("Failed to make cfg");
 
@@ -187,7 +169,7 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
         read_certificates_from_file(&mut file)
     };
 
-    root_store.add(&certs[0]).unwrap();
+    root_store.add(certs[0].clone()).unwrap();
 
     // configure our cert chain and secret key
     let sk = {
@@ -212,13 +194,10 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
         c
     };
 
+
     let cfg = ClientConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()
-        .unwrap()
         .with_root_certificates(root_store)
-        .with_single_cert(chain, sk)
+        .with_client_auth_cert(chain, sk)
         .expect("bad cert/key");
 
     cfg
@@ -235,7 +214,7 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
         read_certificates_from_file(&mut file)
     };
 
-    root_store.add(&certs[0]).unwrap();
+    root_store.add(certs[0].clone()).unwrap();
 
     // configure our cert chain and secret key
     let sk = {
@@ -261,12 +240,8 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
     };
 
     let cfg = ClientConfig::builder()
-        .with_safe_default_cipher_suites()
-        .with_safe_default_kx_groups()
-        .with_safe_default_protocol_versions()
-        .unwrap()
         .with_root_certificates(root_store)
-        .with_single_cert(chain, sk)
+        .with_client_auth_cert(chain, sk)
         .expect("bad cert/key");
 
     cfg
