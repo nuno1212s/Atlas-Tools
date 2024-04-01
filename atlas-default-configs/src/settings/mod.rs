@@ -1,7 +1,7 @@
-use config::{Config, Source};
-use serde::Deserialize;
 use atlas_common::error::*;
 use atlas_common::node_id::NodeType;
+use config::{Config, Source};
+use serde::Deserialize;
 
 /// The node configuration should contain this information
 #[derive(Deserialize, Clone, Debug)]
@@ -34,8 +34,8 @@ pub struct PoolConfig {
     ///How long should a client pool sleep for before attempting to collect requests again
     /// (It actually will sleep between 3/4 and 5/4 of this value, to make sure they don't all sleep / wake up at the same time)
     pub batch_sleep_micros: u64,
-    
-    pub channel_size: usize
+
+    pub channel_size: usize,
 }
 
 impl From<PoolConfig> for atlas_communication::config::ClientPoolConfig {
@@ -68,11 +68,10 @@ pub struct NetworkConfig {
 }
 
 pub fn read_node_config<T>(source: T) -> Result<ReconfigurationConfig>
-    where T: Source + Sync + Send + 'static {
-
-    let settings = Config::builder()
-        .add_source(source)
-        .build()?;
+where
+    T: Source + Sync + Send + 'static,
+{
+    let settings = Config::builder().add_source(source).build()?;
 
     let node_config: ReconfigurationConfig = settings.try_deserialize()?;
 
@@ -80,10 +79,10 @@ pub fn read_node_config<T>(source: T) -> Result<ReconfigurationConfig>
 }
 
 pub fn get_network_config<T>(source: T) -> Result<NetworkConfig>
-    where T: Source + Send + Sync + 'static {
-    let config = Config::builder()
-        .add_source(source)
-        .build()?;
+where
+    T: Source + Send + Sync + 'static,
+{
+    let config = Config::builder().add_source(source).build()?;
 
     let network: NetworkConfig = config.try_deserialize()?;
 

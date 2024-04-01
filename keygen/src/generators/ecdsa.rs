@@ -1,7 +1,9 @@
-use std::path::Path;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use ring::rand::SystemRandom;
-use ring::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, KeyPair};
+use ring::signature::{
+    EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
+};
+use std::path::Path;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub(crate) enum ECDSACurve {
@@ -31,8 +33,12 @@ pub(crate) fn generate_ecdsa(
     std::fs::write(private_key_dest, &private_key_bin)?;
     std::fs::write(public_key_dest, public_key)?;
 
-    let _verify: EcdsaKeyPair =
-        EcdsaKeyPair::from_pkcs8(algorithm, &std::fs::read(private_key_dest).unwrap(), &random).expect("verify");
+    let _verify: EcdsaKeyPair = EcdsaKeyPair::from_pkcs8(
+        algorithm,
+        &std::fs::read(private_key_dest).unwrap(),
+        &random,
+    )
+    .expect("verify");
 
     Ok(())
 }

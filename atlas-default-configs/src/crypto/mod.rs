@@ -1,13 +1,13 @@
+use anyhow::Result;
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::node_id::NodeId;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls_pemfile::{read_one, Item};
 use std::fs::File;
 use std::io::BufReader;
 use std::iter;
 use std::sync::Arc;
-use atlas_common::crypto::signature::{KeyPair, PublicKey};
-use anyhow::Result;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
-use rustls_pemfile::{Item, read_one};
-use atlas_common::node_id::NodeId;
 
 pub fn read_own_keypair(node: &NodeId) -> Result<KeyPair> {
     todo!()
@@ -40,15 +40,9 @@ fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKeyDer<'
 
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
-            Item::Pkcs1Key(rsa) => {
-                certs.push(PrivateKeyDer::Pkcs1(rsa))
-            }
-            Item::Pkcs8Key(rsa) => {
-                certs.push(PrivateKeyDer::Pkcs8(rsa))
-            }
-            Item::Sec1Key(rsa) => {
-                certs.push(PrivateKeyDer::Sec1(rsa))
-            }
+            Item::Pkcs1Key(rsa) => certs.push(PrivateKeyDer::Pkcs1(rsa)),
+            Item::Pkcs8Key(rsa) => certs.push(PrivateKeyDer::Pkcs8(rsa)),
+            Item::Sec1Key(rsa) => certs.push(PrivateKeyDer::Sec1(rsa)),
             _ => {
                 panic!("Certificate given in place of a key")
             }
@@ -73,7 +67,9 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
 
         let certs = read_certificates_from_file(&mut file);
 
-        root_store.add(certs[0].clone()).expect("Failed to put root store");
+        root_store
+            .add(certs[0].clone())
+            .expect("Failed to put root store");
 
         certs
     };
@@ -123,7 +119,7 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     };
 
     root_store.add(certs[0].clone()).unwrap();
-    
+
     // configure our cert chain and secret key
     let sk = {
         let mut file = if id < 1000 {
@@ -147,7 +143,6 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
         c
     };
-
 
     // create server conf
     let cfg = ServerConfig::builder()
@@ -193,7 +188,6 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
         c.extend(certs);
         c
     };
-
 
     let cfg = ClientConfig::builder()
         .with_root_certificates(root_store)
@@ -246,7 +240,6 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 
     cfg
 }
-
 
 fn open_file(path: &str) -> BufReader<File> {
     let file = File::open(path).expect(path);

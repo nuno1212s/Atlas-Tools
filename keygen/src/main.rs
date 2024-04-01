@@ -1,14 +1,14 @@
-use std::path::{Path, PathBuf};
-use serde::Deserialize;
-use clap::{Args, Parser, Subcommand};
-use rcgen::{Certificate, CertificateParams, IsCa};
 use crate::generators::ecdsa::ECDSACurve;
 use crate::generators::rsa::{RSAHash, RSALength};
+use clap::{Args, Parser, Subcommand};
+use rcgen::{Certificate, CertificateParams, IsCa};
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
 
 pub mod generators {
     pub mod ecdsa;
-    pub mod rsa;
     pub mod ed25519;
+    pub mod rsa;
 }
 
 struct KeyNames {
@@ -25,7 +25,6 @@ fn key_names(base: &str, kind: &str, number: usize) -> KeyNames {
         cert: make("cert"),
     }
 }
-
 
 #[derive(Parser, Debug)]
 #[command(author = "Nuno Neto", version, about = "A key generation utility to quickly generate local signed certificates for secure communication", long_about = None)]
@@ -49,9 +48,17 @@ struct Ranges {
     client_count: usize,
     #[arg(short, long, value_name = "REPLICA_COUNT")]
     replica_count: usize,
-    #[arg(long = "first-replica-id", value_name = "REPLICA_START_ID", default_value_t = 0)]
+    #[arg(
+        long = "first-replica-id",
+        value_name = "REPLICA_START_ID",
+        default_value_t = 0
+    )]
     start_replica: usize,
-    #[arg(long = "first-client-id", value_name = "CLIENT_START_ID", default_value_t = 1000)]
+    #[arg(
+        long = "first-client-id",
+        value_name = "CLIENT_START_ID",
+        default_value_t = 1000
+    )]
     start_client: usize,
 }
 
@@ -61,7 +68,7 @@ enum Generator {
     #[command()]
     Ecdsa {
         #[arg(short)]
-        curve: ECDSACurve
+        curve: ECDSACurve,
     },
     #[command()]
     RSA {
@@ -93,12 +100,28 @@ fn main() {
     pool.scoped(|scope| {
         let config = &config;
 
-        for replica_id in config.ranges.start_replica..config.ranges.start_replica + config.ranges.replica_count {
-            scope.execute(move || { generate_key_for(config, config.output_dir.join(format!("{:?}/", replica_id)), replica_id) });
+        for replica_id in
+            config.ranges.start_replica..config.ranges.start_replica + config.ranges.replica_count
+        {
+            scope.execute(move || {
+                generate_key_for(
+                    config,
+                    config.output_dir.join(format!("{:?}/", replica_id)),
+                    replica_id,
+                )
+            });
         }
 
-        for client_id in config.ranges.start_client..config.ranges.start_client + config.ranges.client_count {
-            scope.execute(move || { generate_key_for(config, config.output_dir.join(format!("{:?}/", client_id)), client_id) });
+        for client_id in
+            config.ranges.start_client..config.ranges.start_client + config.ranges.client_count
+        {
+            scope.execute(move || {
+                generate_key_for(
+                    config,
+                    config.output_dir.join(format!("{:?}/", client_id)),
+                    client_id,
+                )
+            });
         }
     });
 
@@ -109,14 +132,17 @@ fn generate_key_for(config: &KeyGenConfig, output_dir: PathBuf, id: usize) {
     match &config.generator {
         Generator::Ecdsa { curve } => {
             let KeyNames {
-                private, public, cert
+                private,
+                public,
+                cert,
             } = key_names("ecdsa", &format!("{:?}", curve), id);
 
             generators::ecdsa::generate_ecdsa(
                 &output_dir.join(private),
                 &output_dir.join(public),
                 curve,
-            ).expect("Failed to generate ecdsa keys");
+            )
+            .expect("Failed to generate ecdsa keys");
         }
         Generator::ED25519 => {
             let KeyNames {
@@ -127,7 +153,8 @@ fn generate_key_for(config: &KeyGenConfig, output_dir: PathBuf, id: usize) {
             generators::ed25519::generate_ed25519(
                 &output_dir.join(&priv_file),
                 &output_dir.join(pub_file),
-            ).expect("generate ed");
+            )
+            .expect("generate ed");
 
             if config.gen_certs {
                 generate_x509(
@@ -142,8 +169,12 @@ fn generate_key_for(config: &KeyGenConfig, output_dir: PathBuf, id: usize) {
     }
 }
 
-
-pub(crate) fn generate_x509(alg: &Generator, name: String, private_key_path: &Path, cert_path: &Path) {
+pub(crate) fn generate_x509(
+    alg: &Generator,
+    name: String,
+    private_key_path: &Path,
+    cert_path: &Path,
+) {
     let key_pair = std::fs::read(private_key_path).unwrap();
     let key_pair = rcgen::KeyPair::from_der(&key_pair).unwrap();
 
@@ -152,24 +183,16 @@ pub(crate) fn generate_x509(alg: &Generator, name: String, private_key_path: &Pa
     params.is_ca = IsCa::NoCa;
 
     match alg {
-        Generator::Ecdsa { curve, .. } => {
-            match curve {
-                ECDSACurve::P256 => {
-                    params.alg = &rcgen::PKCS_ECDSA_P256_SHA256
-                }
-                ECDSACurve::P384 => {
-                    params.alg = &rcgen::PKCS_ECDSA_P384_SHA384
-                }
-            }
-        }
+        Generator::Ecdsa { curve, .. } => match curve {
+            ECDSACurve::P256 => params.alg = &rcgen::PKCS_ECDSA_P256_SHA256,
+            ECDSACurve::P384 => params.alg = &rcgen::PKCS_ECDSA_P384_SHA384,
+        },
         Generator::ED25519 { .. } => params.alg = &rcgen::PKCS_ED25519,
-        Generator::RSA { hash, .. } => {
-            match hash {
-                RSAHash::SHA256 => params.alg = &rcgen::PKCS_RSA_SHA256,
-                RSAHash::SHA384 => params.alg = &rcgen::PKCS_RSA_SHA384,
-                RSAHash::SHA512 => params.alg = &rcgen::PKCS_RSA_SHA512,
-            }
-        }
+        Generator::RSA { hash, .. } => match hash {
+            RSAHash::SHA256 => params.alg = &rcgen::PKCS_RSA_SHA256,
+            RSAHash::SHA384 => params.alg = &rcgen::PKCS_RSA_SHA384,
+            RSAHash::SHA512 => params.alg = &rcgen::PKCS_RSA_SHA512,
+        },
     }
 
     let cert = Certificate::from_params(params).unwrap();
