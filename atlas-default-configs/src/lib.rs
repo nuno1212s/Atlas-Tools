@@ -7,18 +7,19 @@ use atlas_communication::reconfiguration::NodeInfo;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use config::File;
 use config::FileFormat::Toml;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
+use atlas_metrics::InfluxDBArgs;
 use crate::crypto::{
     get_client_config, get_client_config_replica, get_server_config_replica,
     get_tls_sync_server_config, read_own_keypair, read_pk_of,
 };
-use crate::settings::{
-    get_network_config, read_node_config, NetworkConfig, PoolConfig, ReconfigurationConfig,
-};
+use crate::runtime_settings::RunTimeSettings;
+use crate::settings::{get_network_config, read_node_config, NetworkConfig, PoolConfig, ReconfigurationConfig, BindAddr};
 
 pub mod crypto;
 pub mod settings;
+pub mod influx_db_settings;
+pub mod runtime_settings;
 
 pub fn get_tls_config(id: NodeId) -> TlsConfig {
     let client_config = get_client_config(id);
@@ -34,6 +35,18 @@ pub fn get_tls_config(id: NodeId) -> TlsConfig {
     }
 }
 
+pub fn get_influx_configuration(id: Option<NodeId>) -> Result<InfluxDBArgs> {
+    let influx_config = influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), id)?;
+    
+    Ok(influx_config.into())
+}
+
+pub fn get_runtime_configuration() -> Result<RunTimeSettings> {
+    let runtime_settings = runtime_settings::read_runtime_settings(File::new("config/runtime_config.toml", Toml))?;
+    
+    Ok(runtime_settings)
+}
+
 pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolConfig)> {
     let tls_config = get_tls_config(id);
 
@@ -43,9 +56,15 @@ pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolCo
         worker_count,
         pool_config,
         tcp_conns,
+        bind_addr,
     } = network;
 
     let tcp_config = TcpConfig {
+        bind_addrs: bind_addr.map(|addrs| {
+            addrs.into_iter().flat_map(|BindAddr { ip, port }| {
+                (ip, port).to_socket_addrs().expect("Failed to parse IP and port")
+            }).collect()
+        }),
         network_config: tls_config,
         replica_concurrent_connections: tcp_conns.replica_concurrent_connections,
         client_concurrent_connections: tcp_conns.client_concurrent_connections,

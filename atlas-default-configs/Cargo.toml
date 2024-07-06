@@ -14,6 +14,7 @@ atlas-common = { path = "../../Atlas-Common", features = ["serialize_serde"] }
 atlas-communication = { path = "../../Atlas-Communication", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../Atlas-Reconfiguration", features = ["serialize_serde"] }
 atlas-comm-mio = { path = "../../Atlas-Comm-MIO" }
+atlas-metrics = { path = "../../Atlas-Metrics" }
 rustls = "0.22"
 rustls-pemfile = "2"
-config = "0.13.4"
+config = "0.14.0"

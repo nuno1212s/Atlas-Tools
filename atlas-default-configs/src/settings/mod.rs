@@ -65,6 +65,13 @@ pub struct NetworkConfig {
     pub worker_count: usize,
     pub pool_config: PoolConfig,
     pub tcp_conns: TCPConnConfig,
+    pub bind_addr: Option<Vec<BindAddr>>
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct BindAddr {
+    pub ip: String,
+    pub port: u16
 }
 
 pub fn read_node_config<T>(source: T) -> Result<ReconfigurationConfig>
