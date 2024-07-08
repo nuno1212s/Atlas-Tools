@@ -13,7 +13,7 @@ pub(crate) enum ECDSACurve {
     P384,
 }
 
-pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<(String, String)> {
+pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let random = SystemRandom::new();
 
     let algorithm = match kind {
@@ -29,7 +29,7 @@ pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<(String, Strin
     let public_key = private_key.public_key();
 
     Ok((
-        std::str::from_utf8(private_key_bin.as_ref())?.to_string(),
-        std::str::from_utf8(public_key.as_ref())?.to_string(),
+        private_key_bin.as_ref().to_vec(),
+        public_key.as_ref().to_vec(),
     ))
 }

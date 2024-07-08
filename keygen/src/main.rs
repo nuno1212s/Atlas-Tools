@@ -1,12 +1,16 @@
-use crate::generators::ecdsa::ECDSACurve;
-use crate::generators::rsa::{RSAHash, RSALength};
+use std::path::PathBuf;
+
+use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
+use openssl::asn1::Asn1Time;
 use openssl::hash::MessageDigest;
 use openssl::pkey::PKey;
-use openssl::x509::{X509Builder, X509NameBuilder, X509};
+use openssl::x509::{X509, X509Builder, X509NameBuilder};
 use rcgen::{Certificate, CertificateParams, IsCa};
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+
+use crate::generators::ecdsa::ECDSACurve;
+use crate::generators::rsa::{RSAHash, RSALength};
 
 pub mod generators {
     pub mod ecdsa;
@@ -87,9 +91,9 @@ enum Generator {
 }
 
 struct RootCertStore {
-    root_cert: String,
-    priv_key: String,
-    pub_key: String,
+    root_cert: Vec<u8>,
+    priv_key: Vec<u8>,
+    pub_key:Vec<u8>,
 }
 
 fn main() {
@@ -150,7 +154,7 @@ fn main() {
     println!("Generated all keys");
 }
 
-fn generate_root(config: &KeyGenConfig, output_dir: PathBuf) -> (String, String, String) {
+fn generate_root(config: &KeyGenConfig, output_dir: PathBuf) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     std::fs::create_dir_all(output_dir.clone()).expect("Failed to create root output");
 
     let KeyNames { private, cert, .. } = key_names("root", "ca");
@@ -170,15 +174,13 @@ fn generate_root(config: &KeyGenConfig, output_dir: PathBuf) -> (String, String,
     std::fs::write(output_dir.join(cert), &certificate).expect("Failed to write public key");
 
     (
-        std::str::from_utf8(&certificate)
-            .expect("Failed to read certificate")
-            .to_string(),
+        certificate,
         private_key,
         pub_key,
     )
 }
 
-fn generate_keypair(config: &KeyGenConfig) -> (String, String) {
+fn generate_keypair(config: &KeyGenConfig) -> (Vec<u8>, Vec<u8>) {
     match &config.generator {
         Generator::Ecdsa { curve } => {
             let (private_key, public) =
@@ -251,12 +253,10 @@ fn generate_keys_for(
 pub(crate) fn generate_x509(
     alg: &Generator,
     name: String,
-    private_key: &str,
-    public_key: &str,
+    private_key: &[u8],
+    public_key: &[u8],
     ca: Option<&RootCertStore>,
 ) -> anyhow::Result<Vec<u8>> {
-    let subject_pkey = PKey::private_key_from_pem(private_key.as_bytes())?;
-    let subject_pubkey = PKey::public_key_from_pem(public_key.as_bytes())?;
 
     if let Some(RootCertStore {
         root_cert,
@@ -264,8 +264,11 @@ pub(crate) fn generate_x509(
         pub_key,
     }) = ca
     {
-        let root_cert = X509::from_pem(root_cert.as_bytes())?;
-        let root_pkey = PKey::private_key_from_pem(priv_key.as_bytes())?;
+        let subject_pkey = PKey::private_key_from_pkcs8(private_key)?;
+        let subject_pubkey = PKey::public_key_from_pem(public_key)?;
+        
+        let root_cert = X509::from_pem(root_cert)?;
+        let root_pkey = PKey::private_key_from_pkcs8(priv_key)?;
 
         let mut builder = X509Builder::new()?;
         builder.set_version(2)?;
@@ -289,7 +292,7 @@ pub(crate) fn generate_x509(
                 ECDSACurve::P256 => builder.sign(&root_pkey, MessageDigest::sha3_256())?,
                 ECDSACurve::P384 => builder.sign(&root_pkey, MessageDigest::sha3_384())?,
             },
-            Generator::ED25519 { .. } => builder.sign(&root_pkey, MessageDigest::sha3_256())?,
+            Generator::ED25519 { .. } => builder.sign(&root_pkey, MessageDigest::null())?,
             Generator::RSA { hash, .. } => match hash {
                 RSAHash::SHA256 => builder.sign(&root_pkey, MessageDigest::sha3_256())?,
                 RSAHash::SHA384 => builder.sign(&root_pkey, MessageDigest::sha3_384())?,
@@ -305,29 +308,50 @@ pub(crate) fn generate_x509(
 
         Ok(cert_pem)
     } else {
-        let key_pair = rcgen::KeyPair::from_pem(private_key).unwrap();
+        // Load the existing private key
+        let private_key = PKey::private_key_from_pkcs8(private_key).context("Failed reading the private key")?;
 
-        let mut params = CertificateParams::new(vec![name]);
-        params.key_pair = Some(key_pair);
-        params.is_ca = IsCa::NoCa;
+        // Create a new X509 certificate builder
+        let mut builder = X509Builder::new()?;
 
+        // Set the version of the certificate (X.509 Version 3)
+        builder.set_version(2)?;
+
+        // Create and set the subject name
+        let mut name_builder = X509NameBuilder::new()?;
+        name_builder.append_entry_by_text("C", "PT")?;
+        name_builder.append_entry_by_text("CN", name.as_str())?;
+        let name = name_builder.build();
+        builder.set_subject_name(&name)?;
+        builder.set_issuer_name(&name)?;
+
+        // Set the public key
+        builder.set_pubkey(&private_key)?;
+
+        // Set the validity period
+        let not_before = Asn1Time::days_from_now(0)?;
+        let not_after = Asn1Time::days_from_now(365)?;
+        builder.set_not_before(&not_before)?;
+        builder.set_not_after(&not_after)?;
+
+        // Sign the certificate with the private key
         match alg {
             Generator::Ecdsa { curve, .. } => match curve {
-                ECDSACurve::P256 => params.alg = &rcgen::PKCS_ECDSA_P256_SHA256,
-                ECDSACurve::P384 => params.alg = &rcgen::PKCS_ECDSA_P384_SHA384,
+                ECDSACurve::P256 => builder.sign(&private_key, MessageDigest::sha3_256())?,
+                ECDSACurve::P384 => builder.sign(&private_key, MessageDigest::sha3_384())?,
             },
-            Generator::ED25519 { .. } => params.alg = &rcgen::PKCS_ED25519,
+            Generator::ED25519 { .. } => builder.sign(&private_key, MessageDigest::null())?,
             Generator::RSA { hash, .. } => match hash {
-                RSAHash::SHA256 => params.alg = &rcgen::PKCS_RSA_SHA256,
-                RSAHash::SHA384 => params.alg = &rcgen::PKCS_RSA_SHA384,
-                RSAHash::SHA512 => params.alg = &rcgen::PKCS_RSA_SHA512,
+                RSAHash::SHA256 => builder.sign(&private_key, MessageDigest::sha3_256())?,
+                RSAHash::SHA384 => builder.sign(&private_key, MessageDigest::sha3_384())?,
+                RSAHash::SHA512 => builder.sign(&private_key, MessageDigest::sha3_512())?,
             },
-        }
+        };
 
-        let cert = Certificate::from_params(params).unwrap();
+        // Build the certificate
+        let certificate = builder.build();
 
-        let bytes = cert.serialize_pem().unwrap();
-
-        Ok(bytes.as_bytes().to_vec())
+        // Convert the certificate to PEM 
+        Ok(certificate.to_pem()?)
     }
 }

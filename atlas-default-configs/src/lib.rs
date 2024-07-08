@@ -8,6 +8,7 @@ use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use config::File;
 use config::FileFormat::Toml;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
+use anyhow::Context;
 use atlas_metrics::InfluxDBArgs;
 use crate::crypto::{
     get_client_config, get_client_config_replica, get_server_config_replica,
@@ -97,7 +98,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         own_node.hostname,
     );
 
-    let node_kp = read_own_keypair(&node_id)?;
+    let node_kp = read_own_keypair(&node_id).context("Reading own keypair")?;
 
     let mut known_nodes = vec![];
 
@@ -107,7 +108,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         known_nodes.push(NodeInfo::new(
             node_id,
             node.node_type,
-            read_pk_of(&node_id)?,
+            read_pk_of(&node_id).with_context(|| format!("Reading public key of {:?}", node_id))?,
             PeerAddr::new(
                 SocketAddr::V4(SocketAddrV4::new(node.ip.parse::<Ipv4Addr>()?, node.port)),
                 node.hostname,

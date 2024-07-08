@@ -1,18 +1,10 @@
-use ring::rand::SystemRandom;
-use ring::signature::{Ed25519KeyPair, KeyPair};
+use openssl::pkey::PKey;
 
-pub(crate) fn generate_ed25519() -> anyhow::Result<(String, String)> {
-    let random = SystemRandom::new();
+pub(crate) fn generate_ed25519() -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+    let private_key_bin = PKey::generate_ed25519()?;
 
-    let private_key_bin =
-        Ed25519KeyPair::generate_pkcs8(&random).expect("Failed to generate key pair");
-    let private_key =
-        Ed25519KeyPair::from_pkcs8(private_key_bin.as_ref()).expect("Failed to parse the key pair");
-
-    let public_key = private_key.public_key();
-
-    Ok((
-        std::str::from_utf8(private_key_bin.as_ref())?.to_string(),
-        std::str::from_utf8(public_key.as_ref())?.to_string(),
-    ))
+    let pkcs8_private_key = private_key_bin.private_key_to_pkcs8()?;
+    let pkcs8_public_key = private_key_bin.public_key_to_pem()?;
+    
+    Ok((pkcs8_private_key,pkcs8_public_key,))
 }

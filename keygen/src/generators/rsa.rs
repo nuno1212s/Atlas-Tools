@@ -34,7 +34,7 @@ pub(crate) enum RSAHash {
     SHA512,
 }
 
-pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<(String, String)> {
+pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let rsa = Rsa::generate(length.into())?;
 
     let pkey = PKey::from_rsa(rsa)?;
@@ -43,7 +43,7 @@ pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<(String, String
     let public_key = pkey.public_key_to_pem()?;
 
     Ok((
-        std::str::from_utf8(&private_key)?.to_string(),
-        std::str::from_utf8(&public_key)?.to_string(),
+        private_key,
+        public_key,
     ))
 }
