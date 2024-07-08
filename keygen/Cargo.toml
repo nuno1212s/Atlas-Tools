@@ -7,9 +7,10 @@ edition = "2021"
 
 [dependencies]
 config = "0.13"
-ring = { version = "0.17", features = ["std"] }
+ring = { version = "0.17", features = ["default"] }
 rcgen = "0.11.3"
 anyhow = { version = "1.0.52", features = [] }
 serde = "1.0"
 clap = { version = "4.4.8", features = ["derive"] }
 scoped_threadpool = "0.1.9"
+openssl = "0.10"

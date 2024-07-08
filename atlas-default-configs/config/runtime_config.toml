@@ -1,2 +1,2 @@
 threadpool_threads=4
-asyncruntime_threads=4
+async_runtime_threads=2

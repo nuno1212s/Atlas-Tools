@@ -1,20 +1,37 @@
-use anyhow::Result;
-use atlas_common::crypto::signature::{KeyPair, PublicKey};
-use atlas_common::node_id::NodeId;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
-use rustls_pemfile::{read_one, Item};
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::iter;
-use std::sync::Arc;
+
+use anyhow::Result;
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls_pemfile::{Item, read_one};
+
+use atlas_common::crypto::signature::{KeyPair, PublicKey};
+use atlas_common::node_id::{NodeId, NodeType};
 
 pub fn read_own_keypair(node: &NodeId) -> Result<KeyPair> {
-    todo!()
+    let file_location = format!("./ca-root/{}/private", node.0);
+
+    let mut file_content = Vec::new();
+
+    let _read_bytes = open_file(file_location.as_str())
+        .read_to_end(&mut file_content)?;
+
+    KeyPair::from_pkcs8(&file_content)
 }
 
 pub fn read_pk_of(node: &NodeId) -> Result<PublicKey> {
-    todo!()
+    let file_location = format!("./ca-root/{}/public", node.0);
+
+    let mut file_content = Vec::new();
+
+    let _read_bytes = open_file(file_location.as_str())
+        .read_to_end(&mut file_content)?;
+
+    let key_pair = KeyPair::from_pkcs8(&file_content)?;
+
+    Ok(PublicKey::from(key_pair.public_key()))
 }
 
 fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<CertificateDer<'static>> {
@@ -76,21 +93,13 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/key", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/key", id))
-        };
+        let file = open_file(format!("./ca-root/{}/private", id).as_str());
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/crt", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/crt", id))
-        };
+        let mut file = open_file(format!("./ca-root/{}/public", id).as_str());
 
         let mut certs = read_certificates_from_file(&mut file);
 
@@ -113,7 +122,7 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
     // read ca file
     let certs = {
-        let mut file = open_file("./ca-root/crt");
+        let mut file = open_file("./ca-root/cert");
 
         read_certificates_from_file(&mut file)
     };
@@ -122,20 +131,12 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/key", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/key", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/private", id));
 
         read_private_key_from_file(file)
     };
     let chain = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/crt", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/crt", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/cert", id));
 
         let mut c = read_certificates_from_file(&mut file);
 
@@ -160,7 +161,8 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
 
     // configure ca file
     let certs = {
-        let mut file = open_file("./ca-root/crt");
+        let mut file = open_file("./ca-root/cert");
+        
         read_certificates_from_file(&mut file)
     };
 
@@ -168,21 +170,13 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/key", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/key", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/private", id));
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/crt", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/crt", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/cert", id));
         let mut c = read_certificates_from_file(&mut file);
 
         c.extend(certs);
@@ -204,7 +198,7 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 
     // configure ca file
     let certs = {
-        let mut file = open_file("./ca-root/crt");
+        let mut file = open_file("./ca-root/cert");
         read_certificates_from_file(&mut file)
     };
 
@@ -212,21 +206,13 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/key", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/key", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/private", id));
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = if id < 1000 {
-            open_file(&format!("./ca-root/srv{}/crt", id))
-        } else {
-            open_file(&format!("./ca-root/cli{}/crt", id))
-        };
+        let mut file = open_file(&format!("./ca-root/{}/cert", id));
         let mut c = read_certificates_from_file(&mut file);
 
         c.extend(certs);
