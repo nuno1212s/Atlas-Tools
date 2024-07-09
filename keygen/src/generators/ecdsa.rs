@@ -1,9 +1,10 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::ValueEnum;
 use ring::rand::SystemRandom;
 use ring::signature::{
-    EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
+    ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, KeyPair,
 };
-use std::path::Path;
+
+use crate::GeneratedKeyPair;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub(crate) enum ECDSACurve {
@@ -13,7 +14,7 @@ pub(crate) enum ECDSACurve {
     P384,
 }
 
-pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<GeneratedKeyPair> {
     let random = SystemRandom::new();
 
     let algorithm = match kind {
@@ -28,8 +29,9 @@ pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<(Vec<u8>, Vec<
 
     let public_key = private_key.public_key();
 
-    Ok((
-        private_key_bin.as_ref().to_vec(),
-        public_key.as_ref().to_vec(),
-    ))
+    Ok(GeneratedKeyPair {
+        private_key_pkcs8: private_key_bin.as_ref().to_vec(),
+        private_key_pem: vec![],
+        public_key: public_key.as_ref().to_vec(),
+    })
 }

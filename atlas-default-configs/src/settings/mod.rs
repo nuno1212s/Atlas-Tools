@@ -1,7 +1,8 @@
+use config::{Config, Environment, Source};
+use serde::Deserialize;
+
 use atlas_common::error::*;
 use atlas_common::node_id::NodeType;
-use config::{Config, Source};
-use serde::Deserialize;
 
 /// The node configuration should contain this information
 #[derive(Deserialize, Clone, Debug)]
@@ -78,7 +79,12 @@ pub fn read_node_config<T>(source: T) -> Result<ReconfigurationConfig>
 where
     T: Source + Sync + Send + 'static,
 {
-    let settings = Config::builder().add_source(source).build()?;
+    println!("Reading node config with environment source");
+
+    let settings = Config::builder()
+        .add_source(source)
+        .add_source(Environment::default().separator("__"))
+        .build()?;
 
     let node_config: ReconfigurationConfig = settings.try_deserialize()?;
 

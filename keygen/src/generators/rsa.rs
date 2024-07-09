@@ -1,8 +1,8 @@
 use clap::ValueEnum;
-use openssl::error::ErrorStack;
 use openssl::pkey::PKey;
 use openssl::rsa::Rsa;
-use std::path::Path;
+
+use crate::GeneratedKeyPair;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub(crate) enum RSALength {
@@ -34,16 +34,18 @@ pub(crate) enum RSAHash {
     SHA512,
 }
 
-pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
+pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<GeneratedKeyPair> {
     let rsa = Rsa::generate(length.into())?;
 
     let pkey = PKey::from_rsa(rsa)?;
 
     let private_key = pkey.private_key_to_pem_pkcs8()?;
+    let pem_private_key = pkey.private_key_to_pem_pkcs8()?;
     let public_key = pkey.public_key_to_pem()?;
 
-    Ok((
-        private_key,
+    Ok(GeneratedKeyPair {
+        private_key_pkcs8: private_key,
+        private_key_pem: pem_private_key,
         public_key,
-    ))
+    })
 }

@@ -1,31 +1,50 @@
+use std::net::ToSocketAddrs;
+
+use anyhow::Context;
+use config::File;
+use config::FileFormat::Toml;
+
 use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
 use atlas_common::peer_addr::PeerAddr;
 use atlas_communication::config::ClientPoolConfig;
 use atlas_communication::reconfiguration::NodeInfo;
-use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
-use config::File;
-use config::FileFormat::Toml;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, ToSocketAddrs};
-use anyhow::Context;
 use atlas_metrics::InfluxDBArgs;
+use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
+
 use crate::crypto::{
     get_client_config, get_client_config_replica, get_server_config_replica,
     get_tls_sync_server_config, read_own_keypair, read_pk_of,
 };
 use crate::runtime_settings::RunTimeSettings;
-use crate::settings::{get_network_config, read_node_config, NetworkConfig, PoolConfig, ReconfigurationConfig, BindAddr};
+use crate::settings::{BindAddr, get_network_config, NetworkConfig, read_node_config, ReconfigurationConfig};
 
 pub mod crypto;
 pub mod settings;
 pub mod influx_db_settings;
 pub mod runtime_settings;
 
+#[macro_export]
+macro_rules! addr {
+    ($h:expr => $a:expr) => {{
+        let server : Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
+        .expect("Unable to resolve domain")
+        .collect();
+
+        let addr: ::std::net::SocketAddr = server.into_iter().next().expect("Resolved domain has no corresponding IPs?");
+        (addr, String::from($h))
+    }}
+}
+
 pub fn get_tls_config(id: NodeId) -> TlsConfig {
+    println!("Reading client config");
     let client_config = get_client_config(id);
+    println!("Reading tls sync server config");
     let server_config = get_tls_sync_server_config(id);
+    println!("Reading client config replica");
     let client_config_replica = get_client_config_replica(id);
+    println!("Reading server config replica");
     let server_config_replica = get_server_config_replica(id);
 
     TlsConfig {
@@ -49,8 +68,10 @@ pub fn get_runtime_configuration() -> Result<RunTimeSettings> {
 }
 
 pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolConfig)> {
+    println!("Reading tls config");
     let tls_config = get_tls_config(id);
 
+    println!("Reading network config");
     let network = get_network_config(File::new("config/network.toml", Toml))?;
 
     let NetworkConfig {
@@ -91,10 +112,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
     let node_id = NodeId(own_node.node_id);
     let node_type = own_node.node_type;
     let addr = PeerAddr::new(
-        SocketAddr::V4(SocketAddrV4::new(
-            own_node.ip.parse::<Ipv4Addr>()?,
-            own_node.port,
-        )),
+        addr!(&own_node.hostname => format!("{}:{}", own_node.ip, own_node.port).as_str()).0,
         own_node.hostname,
     );
 
@@ -110,7 +128,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
             node.node_type,
             read_pk_of(&node_id).with_context(|| format!("Reading public key of {:?}", node_id))?,
             PeerAddr::new(
-                SocketAddr::V4(SocketAddrV4::new(node.ip.parse::<Ipv4Addr>()?, node.port)),
+                addr!(&node.hostname => format!("{}:{}", node.ip, node.port).as_str()).0,
                 node.hostname,
             ),
         ));
