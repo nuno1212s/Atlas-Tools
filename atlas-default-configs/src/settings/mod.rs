@@ -7,7 +7,7 @@ use atlas_common::node_id::NodeType;
 /// The node configuration should contain this information
 #[derive(Deserialize, Clone, Debug)]
 pub struct Node {
-    pub node_id: u32,
+    pub node_id: String,
     pub ip: String,
     pub port: u16,
     pub hostname: String,

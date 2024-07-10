@@ -3,7 +3,7 @@ use std::net::ToSocketAddrs;
 use anyhow::Context;
 use config::File;
 use config::FileFormat::Toml;
-
+use regex::Regex;
 use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
@@ -101,6 +101,20 @@ pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolCo
     ))
 }
 
+
+fn parse_any_id(node_id: &str) -> NodeId {
+    let regex = Regex::new(r".*?(\d+)$").expect("Failed to compile regex");
+
+    let captured_item = regex.captures_iter(node_id)
+        .next();
+    
+    captured_item
+        .map(|cap| cap.extract())
+        .map(|(_, [f1])| f1.parse().expect("Failed to parse node id"))
+        .map(NodeId)
+        .expect("Failed to parse node id")
+}
+
 pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
     let node_conf = read_node_config(File::new("config/nodes.toml", Toml))?;
 
@@ -109,7 +123,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         bootstrap_nodes,
     } = node_conf;
 
-    let node_id = NodeId(own_node.node_id);
+    let node_id = parse_any_id(&own_node.node_id);
     let node_type = own_node.node_type;
     let addr = PeerAddr::new(
         addr!(&own_node.hostname => format!("{}:{}", own_node.ip, own_node.port).as_str()).0,
@@ -121,7 +135,7 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
     let mut known_nodes = vec![];
 
     for node in bootstrap_nodes {
-        let node_id = NodeId(node.node_id);
+        let node_id = parse_any_id(&node.node_id);
 
         known_nodes.push(NodeInfo::new(
             node_id,

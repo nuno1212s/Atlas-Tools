@@ -18,3 +18,4 @@ atlas-metrics = { path = "../../Atlas-Metrics" }
 rustls = "0.22"
 rustls-pemfile = "2"
 config = "0.14.0"
+regex = "*"

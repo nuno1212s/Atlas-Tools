@@ -1,4 +1,4 @@
-use config::{Config, Source};
+use config::{Config, Environment, Source};
 use serde::Deserialize;
 use atlas_common::node_id::NodeId;
 use atlas_metrics::InfluxDBArgs;
@@ -33,7 +33,9 @@ pub fn read_influx_db_config<T>(source: T, id: Option<NodeId>) -> atlas_common::
 where
     T: Source + Sync + Send + 'static,
 {
-    let mut config_builder = Config::builder().add_source(source);
+    let mut config_builder = Config::builder()
+        .add_source(source)
+        .add_source(Environment::with_prefix("INFLUX"));
     
     if let Some(id) = id {
         config_builder = config_builder.set_override("node_id", id.0)?;
