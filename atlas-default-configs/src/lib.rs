@@ -13,10 +13,7 @@ use atlas_communication::reconfiguration::NodeInfo;
 use atlas_metrics::InfluxDBArgs;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 
-use crate::crypto::{
-    get_client_config, get_client_config_replica, get_server_config_replica,
-    get_tls_sync_server_config, read_own_keypair, read_pk_of,
-};
+use crate::crypto::{FlattenedPathConstructor, get_client_config, get_client_config_replica, get_server_config_replica, get_tls_sync_server_config, read_own_keypair, read_pk_of};
 use crate::runtime_settings::RunTimeSettings;
 use crate::settings::{BindAddr, get_network_config, NetworkConfig, read_node_config, ReconfigurationConfig};
 
@@ -27,25 +24,24 @@ pub mod runtime_settings;
 
 #[macro_export]
 macro_rules! addr {
-    ($h:expr => $a:expr) => {{
+    ($a:expr) => {{
         let server : Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
         .expect("Unable to resolve domain")
         .collect();
 
-        let addr: ::std::net::SocketAddr = server.into_iter().next().expect("Resolved domain has no corresponding IPs?");
-        (addr, String::from($h))
+        server.into_iter().next().expect("Resolved domain has no corresponding IPs?")
     }}
 }
 
 pub fn get_tls_config(id: NodeId) -> TlsConfig {
     println!("Reading client config");
-    let client_config = get_client_config(id);
+    let client_config = get_client_config::<FlattenedPathConstructor>(id);
     println!("Reading tls sync server config");
-    let server_config = get_tls_sync_server_config(id);
+    let server_config = get_tls_sync_server_config::<FlattenedPathConstructor>(id);
     println!("Reading client config replica");
-    let client_config_replica = get_client_config_replica(id);
+    let client_config_replica = get_client_config_replica::<FlattenedPathConstructor>(id);
     println!("Reading server config replica");
-    let server_config_replica = get_server_config_replica(id);
+    let server_config_replica = get_server_config_replica::<FlattenedPathConstructor>(id);
 
     TlsConfig {
         async_client_config: client_config_replica,
@@ -126,23 +122,25 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
     let node_id = parse_any_id(&own_node.node_id);
     let node_type = own_node.node_type;
     let addr = PeerAddr::new(
-        addr!(&own_node.hostname => format!("{}:{}", own_node.ip, own_node.port).as_str()).0,
+        addr!(format!("{}:{}", own_node.ip, own_node.port).as_str()),
         own_node.hostname,
     );
 
-    let node_kp = read_own_keypair(&node_id).context("Reading own keypair")?;
+    let node_kp = read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?;
 
     let mut known_nodes = vec![];
 
     for node in bootstrap_nodes {
         let node_id = parse_any_id(&node.node_id);
 
+        println!("Parsing IP and port {}, {}", node.ip, node.port);
+        
         known_nodes.push(NodeInfo::new(
             node_id,
             node.node_type,
-            read_pk_of(&node_id).with_context(|| format!("Reading public key of {:?}", node_id))?,
+            read_pk_of::<FlattenedPathConstructor>(&node_id).with_context(|| format!("Reading public key of {:?}", node_id))?,
             PeerAddr::new(
-                addr!(&node.hostname => format!("{}:{}", node.ip, node.port).as_str()).0,
+                addr!(format!("{}:{}", node.ip, node.port).as_str()),
                 node.hostname,
             ),
         ));

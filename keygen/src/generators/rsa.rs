@@ -42,10 +42,12 @@ pub(crate) fn generate_rsa(length: &RSALength) -> anyhow::Result<GeneratedKeyPai
     let private_key = pkey.private_key_to_pem_pkcs8()?;
     let pem_private_key = pkey.private_key_to_pem_pkcs8()?;
     let public_key = pkey.public_key_to_pem()?;
+    let pkcs8_public_key = pkey.public_key_to_der()?;
 
     Ok(GeneratedKeyPair {
         private_key_pkcs8: private_key,
         private_key_pem: pem_private_key,
         public_key,
+        pub_key_pcks: pkcs8_public_key,
     })
 }

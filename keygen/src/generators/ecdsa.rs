@@ -33,5 +33,6 @@ pub(crate) fn generate_ecdsa(kind: &ECDSACurve) -> anyhow::Result<GeneratedKeyPa
         private_key_pkcs8: private_key_bin.as_ref().to_vec(),
         private_key_pem: vec![],
         public_key: public_key.as_ref().to_vec(),
+        pub_key_pcks: public_key.as_ref().to_vec(),
     })
 }

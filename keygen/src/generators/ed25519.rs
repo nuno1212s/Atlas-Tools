@@ -6,11 +6,14 @@ pub(crate) fn generate_ed25519() -> anyhow::Result<GeneratedKeyPair> {
 
     let pkcs8_private_key = private_key_bin.private_key_to_pkcs8()?;
     let pem_private_key = private_key_bin.private_key_to_pem_pkcs8()?;
-    let pkcs8_public_key = private_key_bin.public_key_to_pem()?;
+    let pem_public_key = private_key_bin.public_key_to_pem()?;
+    let pkcs8_public_key = private_key_bin.public_key_to_der()?;
+    
 
     Ok(GeneratedKeyPair {
         private_key_pkcs8: pkcs8_private_key,
         private_key_pem: pem_private_key,
-        public_key: pkcs8_public_key,
+        public_key: pem_public_key,
+        pub_key_pcks: pkcs8_public_key,
     })
 }

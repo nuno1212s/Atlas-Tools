@@ -1,8 +1,9 @@
+use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::iter;
 
-use anyhow::Result;
+use anyhow::{ Result};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls_pemfile::{Item, read_one};
@@ -10,8 +11,8 @@ use rustls_pemfile::{Item, read_one};
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::node_id::NodeId;
 
-pub fn read_own_keypair(node: &NodeId) -> Result<KeyPair> {
-    let file_location = format!("./ca-root/{}/private", node.0);
+pub fn read_own_keypair<T>(node: &NodeId) -> Result<KeyPair> where T: PathConstructor {
+    let file_location = T::build_path_for(FileType::PrivateKey, Some(*node));
 
     let mut file_content = Vec::new();
 
@@ -21,8 +22,8 @@ pub fn read_own_keypair(node: &NodeId) -> Result<KeyPair> {
     KeyPair::from_pkcs8(&file_content)
 }
 
-pub fn read_pk_of(node: &NodeId) -> Result<PublicKey> {
-    let file_location = format!("./ca-root/{}/private", node.0);
+pub fn read_pk_of<T>(node: &NodeId) -> Result<PublicKey> where T: PathConstructor {
+    let file_location = T::build_path_for(FileType::PrivateKey, Some(*node));
 
     let mut file_content = Vec::new();
 
@@ -30,7 +31,7 @@ pub fn read_pk_of(node: &NodeId) -> Result<PublicKey> {
         .read_to_end(&mut file_content)?;
 
     let key_pair = KeyPair::from_pkcs8(&file_content)?;
-    
+
     Ok(PublicKey::from(key_pair.public_key()))
 }
 
@@ -54,7 +55,7 @@ fn read_certificates_from_file(mut file: &mut BufReader<File>) -> Vec<Certificat
 #[inline]
 fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKeyDer<'static>> {
     let mut certs = Vec::new();
-    
+
     for item in iter::from_fn(|| read_one(&mut file).transpose()) {
         match item.unwrap() {
             Item::Pkcs1Key(rsa) => certs.push(PrivateKeyDer::Pkcs1(rsa)),
@@ -74,13 +75,51 @@ fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKeyDer<'stati
     read_private_keys_from_file(file).pop().unwrap()
 }
 
-pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
-    let id = usize::from(id);
+enum FileType {
+    Cert,
+    PrivateKey,
+    PrivateKeyPem,
+    PublicKey,
+    PublicKeyPkcs
+}
+
+pub trait PathConstructor: 'static {
+    fn build_path_for(file_type: FileType, node_id: Option<NodeId>) -> String;
+}
+
+pub struct FolderPathConstructor;
+
+pub struct FlattenedPathConstructor;
+
+impl PathConstructor for FolderPathConstructor {
+    fn build_path_for(file_type: FileType, node_id: Option<NodeId>) -> String {
+        if let Some(node_id) = node_id {
+            format!("./ca-root/{}/{}", node_id.0, file_type)
+        } else {
+            format!("./ca-root/{}", file_type)
+        }
+    }
+}
+
+impl PathConstructor for FlattenedPathConstructor {
+    fn build_path_for(file_type: FileType, node_id: Option<NodeId>) -> String {
+        if let Some(node_id) = node_id {
+            format!("./ca-root/ca-root-{}-{}", node_id.0, file_type)
+        } else {
+            format!("./ca-root/ca-root-{}", file_type)
+        }
+    }
+}
+
+pub fn get_tls_sync_server_config<T>(id: NodeId) -> ServerConfig
+where
+    T: PathConstructor,
+{
     let mut root_store = RootCertStore::empty();
 
     // read ca file
     let cert = {
-        let mut file = open_file("./ca-root/cert");
+        let mut file = open_file(T::build_path_for(FileType::Cert, None).as_str());
 
         let certs = read_certificates_from_file(&mut file);
 
@@ -93,13 +132,13 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let file = open_file(format!("./ca-root/{}/private_pem", id).as_str());
+        let file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = open_file(format!("./ca-root/{}/cert", id).as_str());
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());
 
         let mut certs = read_certificates_from_file(&mut file);
 
@@ -116,13 +155,15 @@ pub fn get_tls_sync_server_config(id: NodeId) -> ServerConfig {
     cfg
 }
 
-pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
-    let id = usize::from(id);
+pub fn get_server_config_replica<T>(id: NodeId) -> rustls::ServerConfig
+where
+    T: PathConstructor,
+{
     let mut root_store = RootCertStore::empty();
 
     // read ca file
     let certs = {
-        let mut file = open_file("./ca-root/cert");
+        let mut file = open_file(T::build_path_for(FileType::Cert, None).as_str());
 
         read_certificates_from_file(&mut file)
     };
@@ -131,12 +172,12 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(&format!("./ca-root/{}/private_pem", id));
+        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
     let chain = {
-        let mut file = open_file(&format!("./ca-root/{}/cert", id));
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());;
 
         let mut c = read_certificates_from_file(&mut file);
 
@@ -154,15 +195,16 @@ pub fn get_server_config_replica(id: NodeId) -> rustls::ServerConfig {
     cfg
 }
 
-pub fn get_client_config(id: NodeId) -> ClientConfig {
-    let id = usize::from(id);
-
+pub fn get_client_config<T>(id: NodeId) -> ClientConfig
+where
+    T: PathConstructor,
+{
     let mut root_store = RootCertStore::empty();
 
     // configure ca file
     let certs = {
-        let mut file = open_file("./ca-root/cert");
-        
+        let mut file = open_file(T::build_path_for(FileType::Cert, None).as_str());
+
         read_certificates_from_file(&mut file)
     };
 
@@ -170,13 +212,13 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(&format!("./ca-root/{}/private_pem", id));
+        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = open_file(&format!("./ca-root/{}/cert", id));
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());;
         let mut c = read_certificates_from_file(&mut file);
 
         c.extend(certs);
@@ -191,14 +233,15 @@ pub fn get_client_config(id: NodeId) -> ClientConfig {
     cfg
 }
 
-pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
-    let id = usize::from(id);
-
+pub fn get_client_config_replica<T>(id: NodeId) -> rustls::ClientConfig
+where
+    T: PathConstructor,
+{
     let mut root_store = RootCertStore::empty();
 
     // configure ca file
     let certs = {
-        let mut file = open_file("./ca-root/cert");
+        let mut file = open_file(T::build_path_for(FileType::Cert, None).as_str());
         read_certificates_from_file(&mut file)
     };
 
@@ -206,13 +249,13 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(&format!("./ca-root/{}/private_pem", id));
+        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());;
 
         read_private_key_from_file(file)
     };
 
     let chain = {
-        let mut file = open_file(&format!("./ca-root/{}/cert", id));
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());
         let mut c = read_certificates_from_file(&mut file);
 
         c.extend(certs);
@@ -230,4 +273,23 @@ pub fn get_client_config_replica(id: NodeId) -> rustls::ClientConfig {
 fn open_file(path: &str) -> BufReader<File> {
     let file = File::open(path).expect(path);
     BufReader::new(file)
+}
+
+
+impl Display for FileType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileType::Cert => write!(f, "cert"),
+            FileType::PrivateKey => write!(f, "private"),
+            FileType::PrivateKeyPem => write!(f, "private_pem"),
+            FileType::PublicKey => write!(f, "public"),
+            FileType::PublicKeyPkcs => write!(f, "public_pkcs"),
+        }
+    }
+}
+
+impl Debug for FileType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
 }
