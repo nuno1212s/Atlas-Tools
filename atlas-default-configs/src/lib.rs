@@ -1,9 +1,6 @@
 use std::net::ToSocketAddrs;
 
 use anyhow::Context;
-use config::File;
-use config::FileFormat::Toml;
-use regex::Regex;
 use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::error::*;
 use atlas_common::node_id::NodeId;
@@ -12,25 +9,36 @@ use atlas_communication::config::ClientPoolConfig;
 use atlas_communication::reconfiguration::NodeInfo;
 use atlas_metrics::InfluxDBArgs;
 use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
+use config::File;
+use config::FileFormat::Toml;
+use regex::Regex;
 
-use crate::crypto::{FlattenedPathConstructor, get_client_config, get_client_config_replica, get_server_config_replica, get_tls_sync_server_config, read_own_keypair, read_pk_of};
+use crate::crypto::{
+    get_client_config, get_client_config_replica, get_server_config_replica,
+    get_tls_sync_server_config, read_own_keypair, read_pk_of, FlattenedPathConstructor,
+};
 use crate::runtime_settings::RunTimeSettings;
-use crate::settings::{BindAddr, get_network_config, NetworkConfig, read_node_config, ReconfigurationConfig};
+use crate::settings::{
+    get_network_config, read_node_config, BindAddr, NetworkConfig, ReconfigurationConfig,
+};
 
 pub mod crypto;
-pub mod settings;
 pub mod influx_db_settings;
 pub mod runtime_settings;
+pub mod settings;
 
 #[macro_export]
 macro_rules! addr {
     ($a:expr) => {{
-        let server : Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
-        .expect("Unable to resolve domain")
-        .collect();
+        let server: Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
+            .expect("Unable to resolve domain")
+            .collect();
 
-        server.into_iter().next().expect("Resolved domain has no corresponding IPs?")
-    }}
+        server
+            .into_iter()
+            .next()
+            .expect("Resolved domain has no corresponding IPs?")
+    }};
 }
 
 pub fn get_tls_config(id: NodeId) -> TlsConfig {
@@ -52,14 +60,16 @@ pub fn get_tls_config(id: NodeId) -> TlsConfig {
 }
 
 pub fn get_influx_configuration(id: Option<NodeId>) -> Result<InfluxDBArgs> {
-    let influx_config = influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), id)?;
-    
+    let influx_config =
+        influx_db_settings::read_influx_db_config(File::new("config/influx_db.toml", Toml), id)?;
+
     Ok(influx_config.into())
 }
 
 pub fn get_runtime_configuration() -> Result<RunTimeSettings> {
-    let runtime_settings = runtime_settings::read_runtime_settings(File::new("config/runtime_config.toml", Toml))?;
-    
+    let runtime_settings =
+        runtime_settings::read_runtime_settings(File::new("config/runtime_config.toml", Toml))?;
+
     Ok(runtime_settings)
 }
 
@@ -79,9 +89,14 @@ pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolCo
 
     let tcp_config = TcpConfig {
         bind_addrs: bind_addr.map(|addrs| {
-            addrs.into_iter().flat_map(|BindAddr { ip, port }| {
-                (ip, port).to_socket_addrs().expect("Failed to parse IP and port")
-            }).collect()
+            addrs
+                .into_iter()
+                .flat_map(|BindAddr { ip, port }| {
+                    (ip, port)
+                        .to_socket_addrs()
+                        .expect("Failed to parse IP and port")
+                })
+                .collect()
         }),
         network_config: tls_config,
         replica_concurrent_connections: tcp_conns.replica_concurrent_connections,
@@ -97,13 +112,11 @@ pub fn get_network_configurations(id: NodeId) -> Result<(MIOConfig, ClientPoolCo
     ))
 }
 
-
 fn parse_any_id(node_id: &str) -> NodeId {
     let regex = Regex::new(r".*?(\d+)$").expect("Failed to compile regex");
 
-    let captured_item = regex.captures_iter(node_id)
-        .next();
-    
+    let captured_item = regex.captures_iter(node_id).next();
+
     captured_item
         .map(|cap| cap.extract())
         .map(|(_, [f1])| f1.parse().expect("Failed to parse node id"))
@@ -126,7 +139,8 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         own_node.hostname,
     );
 
-    let node_kp = read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?;
+    let node_kp =
+        read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?;
 
     let mut known_nodes = vec![];
 
@@ -134,11 +148,12 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         let node_id = parse_any_id(&node.node_id);
 
         println!("Parsing IP and port {}, {}", node.ip, node.port);
-        
+
         known_nodes.push(NodeInfo::new(
             node_id,
             node.node_type,
-            read_pk_of::<FlattenedPathConstructor>(&node_id).with_context(|| format!("Reading public key of {:?}", node_id))?,
+            read_pk_of::<FlattenedPathConstructor>(&node_id)
+                .with_context(|| format!("Reading public key of {:?}", node_id))?,
             PeerAddr::new(
                 addr!(format!("{}:{}", node.ip, node.port).as_str()),
                 node.hostname,

@@ -3,32 +3,36 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::iter;
 
-use anyhow::{ Result};
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use anyhow::Result;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls_pemfile::{Item, read_one};
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls_pemfile::{read_one, Item};
 
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
 use atlas_common::node_id::NodeId;
 
-pub fn read_own_keypair<T>(node: &NodeId) -> Result<KeyPair> where T: PathConstructor {
+pub fn read_own_keypair<T>(node: &NodeId) -> Result<KeyPair>
+where
+    T: PathConstructor,
+{
     let file_location = T::build_path_for(FileType::PrivateKey, Some(*node));
 
     let mut file_content = Vec::new();
 
-    let _read_bytes = open_file(file_location.as_str())
-        .read_to_end(&mut file_content)?;
+    let _read_bytes = open_file(file_location.as_str()).read_to_end(&mut file_content)?;
 
     KeyPair::from_pkcs8(&file_content)
 }
 
-pub fn read_pk_of<T>(node: &NodeId) -> Result<PublicKey> where T: PathConstructor {
+pub fn read_pk_of<T>(node: &NodeId) -> Result<PublicKey>
+where
+    T: PathConstructor,
+{
     let file_location = T::build_path_for(FileType::PrivateKey, Some(*node));
 
     let mut file_content = Vec::new();
 
-    let _read_bytes = open_file(file_location.as_str())
-        .read_to_end(&mut file_content)?;
+    let _read_bytes = open_file(file_location.as_str()).read_to_end(&mut file_content)?;
 
     let key_pair = KeyPair::from_pkcs8(&file_content)?;
 
@@ -80,7 +84,7 @@ enum FileType {
     PrivateKey,
     PrivateKeyPem,
     PublicKey,
-    PublicKeyPkcs
+    PublicKeyPkcs,
 }
 
 pub trait PathConstructor: 'static {
@@ -177,7 +181,7 @@ where
         read_private_key_from_file(file)
     };
     let chain = {
-        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());;
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());
 
         let mut c = read_certificates_from_file(&mut file);
 
@@ -218,7 +222,7 @@ where
     };
 
     let chain = {
-        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());;
+        let mut file = open_file(T::build_path_for(FileType::Cert, Some(id)).as_str());
         let mut c = read_certificates_from_file(&mut file);
 
         c.extend(certs);
@@ -249,7 +253,7 @@ where
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());;
+        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
@@ -274,7 +278,6 @@ fn open_file(path: &str) -> BufReader<File> {
     let file = File::open(path).expect(path);
     BufReader::new(file)
 }
-
 
 impl Display for FileType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use openssl::asn1::Asn1Time;
 use openssl::hash::MessageDigest;
 use openssl::pkey::PKey;
-use openssl::x509::{X509, X509Builder, X509NameBuilder};
+use openssl::x509::{X509Builder, X509NameBuilder, X509};
 use serde::Deserialize;
 
 use crate::generators::ecdsa::ECDSACurve;
@@ -171,7 +171,7 @@ fn generate_root(config: &KeyGenConfig, output_dir: PathBuf) -> (Vec<u8>, Vec<u8
     let GeneratedKeyPair {
         private_key_pkcs8: private_key,
         private_key_pem,
-        public_key: pub_key, 
+        public_key: pub_key,
         pub_key_pcks,
     } = generate_keypair(config);
 
@@ -182,7 +182,7 @@ fn generate_root(config: &KeyGenConfig, output_dir: PathBuf) -> (Vec<u8>, Vec<u8
         &pub_key,
         None,
     )
-        .expect("Failed to generate root certificate");
+    .expect("Failed to generate root certificate");
 
     std::fs::write(output_dir.join(private), &private_key).expect("Failed to write private key");
     std::fs::write(output_dir.join(private_pem), private_key_pem)
@@ -197,7 +197,7 @@ struct GeneratedKeyPair {
     private_key_pkcs8: Vec<u8>,
     private_key_pem: Vec<u8>,
     public_key: Vec<u8>,
-    pub_key_pcks: Vec<u8>
+    pub_key_pcks: Vec<u8>,
 }
 
 fn generate_keypair(config: &KeyGenConfig) -> GeneratedKeyPair {
@@ -230,7 +230,8 @@ fn generate_keys_for(
         private,
         private_pem,
         public,
-        public_pcks, cert,
+        public_pcks,
+        cert,
     } = match &config.generator {
         Generator::Ecdsa { curve } => key_names("ecdsa", &format!("{:?}", curve)),
         Generator::ED25519 => key_names("ed", "25519"),
@@ -240,14 +241,16 @@ fn generate_keys_for(
     let GeneratedKeyPair {
         private_key_pkcs8: private_key,
         public_key,
-        private_key_pem, pub_key_pcks,
+        private_key_pem,
+        pub_key_pcks,
     } = generate_keypair(config);
 
     std::fs::write(output_dir.join(private), &private_key).expect("Failed to write private key");
     std::fs::write(output_dir.join(private_pem), private_key_pem)
         .expect("Failed to write private key");
     std::fs::write(output_dir.join(public), &public_key).expect("Failed to write public key");
-    std::fs::write(output_dir.join(public_pcks), &pub_key_pcks).expect("Failed to write public key");
+    std::fs::write(output_dir.join(public_pcks), &pub_key_pcks)
+        .expect("Failed to write public key");
 
     if config.gen_certs {
         let certificate_path = &output_dir.join(cert);
@@ -259,7 +262,7 @@ fn generate_keys_for(
             &public_key,
             Some(root_ca),
         )
-            .expect("");
+        .expect("");
 
         std::fs::write(certificate_path, certificate).expect("Failed to write certificate");
     }
@@ -273,10 +276,10 @@ pub(crate) fn generate_x509(
     ca: Option<&RootCertStore>,
 ) -> anyhow::Result<Vec<u8>> {
     if let Some(RootCertStore {
-                    root_cert,
-                    priv_key,
-                    pub_key,
-                }) = ca
+        root_cert,
+        priv_key,
+        pub_key,
+    }) = ca
     {
         let subject_pkey = PKey::private_key_from_pkcs8(private_key)?;
         let subject_pubkey = PKey::public_key_from_pem(public_key)?;

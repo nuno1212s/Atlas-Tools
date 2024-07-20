@@ -1,5 +1,5 @@
-use config::{Config, Environment, Source};
 use config::Case::Upper;
+use config::{Config, Environment, Source};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]

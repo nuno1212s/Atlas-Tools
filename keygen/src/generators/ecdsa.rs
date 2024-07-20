@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use ring::rand::SystemRandom;
 use ring::signature::{
-    ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, KeyPair,
+    EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
 };
 
 use crate::GeneratedKeyPair;
