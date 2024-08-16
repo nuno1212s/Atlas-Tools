@@ -1,5 +1,3 @@
-use std::net::ToSocketAddrs;
-
 use anyhow::Context;
 use atlas_comm_mio::config::{MIOConfig, TcpConfig, TlsConfig};
 use atlas_common::error::*;
@@ -12,6 +10,8 @@ use atlas_reconfiguration::config::ReconfigurableNetworkConfig;
 use config::File;
 use config::FileFormat::Toml;
 use regex::Regex;
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
 use crate::crypto::{
     get_client_config, get_client_config_replica, get_server_config_replica,
@@ -139,8 +139,9 @@ pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
         own_node.hostname,
     );
 
-    let node_kp =
-        read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?;
+    let node_kp = Arc::new(
+        read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?,
+    );
 
     let mut known_nodes = vec![];
 
