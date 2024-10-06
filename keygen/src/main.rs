@@ -6,7 +6,7 @@ use openssl::asn1::Asn1Time;
 use openssl::hash::MessageDigest;
 use openssl::pkey::PKey;
 use openssl::x509::{X509Builder, X509NameBuilder, X509};
-use serde::Deserialize;
+
 
 use crate::generators::ecdsa::ECDSACurve;
 use crate::generators::rsa::{RSAHash, RSALength};
@@ -278,10 +278,10 @@ pub(crate) fn generate_x509(
     if let Some(RootCertStore {
         root_cert,
         priv_key,
-        pub_key,
+        pub_key: _,
     }) = ca
     {
-        let subject_pkey = PKey::private_key_from_pkcs8(private_key)?;
+        let _subject_pkey = PKey::private_key_from_pkcs8(private_key)?;
         let subject_pubkey = PKey::public_key_from_pem(public_key)?;
 
         let root_cert = X509::from_pem(root_cert)?;

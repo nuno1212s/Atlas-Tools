@@ -75,7 +75,7 @@ fn read_private_keys_from_file(mut file: BufReader<File>) -> Vec<PrivateKeyDer<'
 }
 
 #[inline]
-fn read_private_key_from_file(mut file: BufReader<File>) -> PrivateKeyDer<'static> {
+fn read_private_key_from_file(file: BufReader<File>) -> PrivateKeyDer<'static> {
     read_private_keys_from_file(file).pop().unwrap()
 }
 
@@ -176,7 +176,7 @@ where
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
+        let file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
@@ -216,7 +216,7 @@ where
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
+        let file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
@@ -253,7 +253,7 @@ where
 
     // configure our cert chain and secret key
     let sk = {
-        let mut file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
+        let file = open_file(T::build_path_for(FileType::PrivateKeyPem, Some(id)).as_str());
 
         read_private_key_from_file(file)
     };
