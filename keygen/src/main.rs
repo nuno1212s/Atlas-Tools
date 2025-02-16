@@ -7,7 +7,6 @@ use openssl::hash::MessageDigest;
 use openssl::pkey::PKey;
 use openssl::x509::{X509Builder, X509NameBuilder, X509};
 
-
 use crate::generators::ecdsa::ECDSACurve;
 use crate::generators::rsa::{RSAHash, RSALength};
 

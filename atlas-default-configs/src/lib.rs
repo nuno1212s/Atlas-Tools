@@ -124,8 +124,8 @@ fn parse_any_id(node_id: &str) -> NodeId {
         .expect("Failed to parse node id")
 }
 
-pub fn get_reconfig_config() -> Result<ReconfigurableNetworkConfig> {
-    let node_conf = read_node_config(File::new("config/nodes.toml", Toml))?;
+pub fn get_reconfig_config(file: &str) -> Result<ReconfigurableNetworkConfig> {
+    let node_conf = read_node_config(File::new(file, Toml))?;
 
     let ReconfigurationConfig {
         own_node,
