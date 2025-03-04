@@ -7,13 +7,15 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2"
 
 serde = { version = "1", features = ["derive"] }
 atlas-common = { path = "../../Atlas-Common", features = ["serialize_serde"] }
 atlas-communication = { path = "../../Atlas-Communication", features = ["serialize_serde"] }
 atlas-reconfiguration = { path = "../../Atlas-Reconfiguration", features = ["serialize_serde"] }
 atlas-comm-mio = { path = "../../Atlas-Comm-MIO" }
-rustls = "0.22"
+atlas-metrics = { path = "../../Atlas-Metrics" }
+rustls = "0"
 rustls-pemfile = "2"
-config = "0.13.4"
+config = "0.15.7"
+regex = "*"

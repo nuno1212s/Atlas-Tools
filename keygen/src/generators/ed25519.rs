@@ -1,27 +1,18 @@
-use anyhow::Context;
-use ring::rand::SystemRandom;
-use ring::signature::{Ed25519KeyPair, KeyPair};
-use std::path::Path;
+use crate::GeneratedKeyPair;
+use openssl::pkey::PKey;
 
-pub(crate) fn generate_ed25519(
-    private_key_dest: &Path,
-    public_key_dest: &Path,
-) -> anyhow::Result<()> {
-    let random = SystemRandom::new();
+pub(crate) fn generate_ed25519() -> anyhow::Result<GeneratedKeyPair> {
+    let private_key_bin = PKey::generate_ed25519()?;
 
-    let private_key_bin = Ed25519KeyPair::generate_pkcs8(&random)?;
-    let private_key = Ed25519KeyPair::from_pkcs8(private_key_bin.as_ref())?;
+    let pkcs8_private_key = private_key_bin.private_key_to_pkcs8()?;
+    let pem_private_key = private_key_bin.private_key_to_pem_pkcs8()?;
+    let pem_public_key = private_key_bin.public_key_to_pem()?;
+    let pkcs8_public_key = private_key_bin.public_key_to_der()?;
 
-    let public_key = private_key.public_key();
-
-    std::fs::write(private_key_dest, private_key_bin)?;
-    std::fs::write(public_key_dest, public_key)?;
-
-    let pkcs8 = &std::fs::read(private_key_dest)
-        .with_context(|| format!("Failed to read file {:?}", private_key_dest))?;
-
-    let _verify: Ed25519KeyPair =
-        Ed25519KeyPair::from_pkcs8(pkcs8).context("Failed to verify key pair")?;
-
-    Ok(())
+    Ok(GeneratedKeyPair {
+        private_key_pkcs8: pkcs8_private_key,
+        private_key_pem: pem_private_key,
+        public_key: pem_public_key,
+        pub_key_pcks: pkcs8_public_key,
+    })
 }
