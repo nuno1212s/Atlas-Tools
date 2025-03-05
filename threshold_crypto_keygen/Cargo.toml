@@ -1,0 +1,19 @@
+[package]
+name = "threshold_crypto_keygen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+atlas-common = { path = "../../Atlas-Common", features = ["serialize_serde"] }
+clap = { version = "4", features = ["derive"] }
+serde = "*"
+serde_json = "*"
+anyhow = "*"
+
+[lib]
+name = "threshold_crypto_keygen"
+path = "src/lib.rs"
+
+[[bin]]
+name = "threshold_crypto_keygen"
+path = "src/main.rs"
