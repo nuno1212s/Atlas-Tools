@@ -4,8 +4,8 @@ use std::io::{BufReader, Read};
 use std::iter;
 
 use anyhow::Result;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls_pemfile::{read_one, Item};
 
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
@@ -79,7 +79,7 @@ fn read_private_key_from_file(file: BufReader<File>) -> PrivateKeyDer<'static> {
     read_private_keys_from_file(file).pop().unwrap()
 }
 
-enum FileType {
+pub enum FileType {
     Cert,
     PrivateKey,
     PrivateKeyPem,
@@ -100,7 +100,7 @@ impl PathConstructor for FolderPathConstructor {
         if let Some(node_id) = node_id {
             format!("./ca-root/{}/{}", node_id.0, file_type)
         } else {
-            format!("./ca-root/{}", file_type)
+            format!("./ca-root/{file_type}")
         }
     }
 }
@@ -110,7 +110,7 @@ impl PathConstructor for FlattenedPathConstructor {
         if let Some(node_id) = node_id {
             format!("./ca-root/ca-root-{}-{}", node_id.0, file_type)
         } else {
-            format!("./ca-root/ca-root-{}", file_type)
+            format!("./ca-root/ca-root-{file_type}")
         }
     }
 }
