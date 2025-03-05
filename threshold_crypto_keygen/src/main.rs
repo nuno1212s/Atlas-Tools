@@ -1,9 +1,9 @@
 use clap::Parser;
-use threshold_crypto_keygen::ProgramArguments;
+use threshold_crypto_keygen::ThresholdCryptoGeneratorArgs;
 
 fn main() {
     
-    let arguments = ProgramArguments::parse();
+    let arguments = ThresholdCryptoGeneratorArgs::parse();
     
     println!("Running threshold key producer with arguments: {arguments:?}");
     
