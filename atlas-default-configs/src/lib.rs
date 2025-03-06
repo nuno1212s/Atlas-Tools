@@ -124,7 +124,7 @@ fn parse_any_id(node_id: &str) -> NodeId {
 /// # [Errors]
 /// Reports errors related to IO and configuration file parsing
 pub fn get_reconfig_config<T>(file: Option<&str>) -> Result<ReconfigurableNetworkConfig> where T: PathConstructor {
-    let node_conf = read_node_config(File::new(file.unwrap_or("config/nodes.toml"), Toml))?;
+    let node_conf = read_node_config(File::new(file.unwrap_or("config/nodes.toml"), Toml)).context("Failed to parse reconfiguration config")?;
 
     let ReconfigurationConfig {
         own_node,
