@@ -13,10 +13,7 @@ use regex::Regex;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 
-use crate::crypto::{
-    get_client_config, get_client_config_replica, get_server_config_replica,
-    get_tls_sync_server_config, read_own_keypair, read_pk_of, FlattenedPathConstructor,
-};
+use crate::crypto::{get_client_config, get_client_config_replica, get_server_config_replica, get_tls_sync_server_config, read_own_keypair, read_pk_of, FlattenedPathConstructor, PathConstructor};
 use crate::runtime_settings::RunTimeSettings;
 use crate::settings::{
     get_network_config, read_node_config, BindAddr, NetworkConfig, ReconfigurationConfig,
@@ -124,8 +121,10 @@ fn parse_any_id(node_id: &str) -> NodeId {
         .expect("Failed to parse node id")
 }
 
-pub fn get_reconfig_config(file: &str) -> Result<ReconfigurableNetworkConfig> {
-    let node_conf = read_node_config(File::new(file, Toml))?;
+/// # [Errors]
+/// Reports errors related to IO and configuration file parsing
+pub fn get_reconfig_config<T>(file: Option<&str>) -> Result<ReconfigurableNetworkConfig> where T: PathConstructor {
+    let node_conf = read_node_config(File::new(file.unwrap_or("config/nodes.toml"), Toml))?;
 
     let ReconfigurationConfig {
         own_node,
@@ -140,7 +139,7 @@ pub fn get_reconfig_config(file: &str) -> Result<ReconfigurableNetworkConfig> {
     );
 
     let node_kp = Arc::new(
-        read_own_keypair::<FlattenedPathConstructor>(&node_id).context("Reading own keypair")?,
+        read_own_keypair::<T>(&node_id).context("Reading own keypair")?,
     );
 
     let mut known_nodes = vec![];
@@ -153,7 +152,7 @@ pub fn get_reconfig_config(file: &str) -> Result<ReconfigurableNetworkConfig> {
         known_nodes.push(NodeInfo::new(
             node_id,
             node.node_type,
-            read_pk_of::<FlattenedPathConstructor>(&node_id)
+            read_pk_of::<T>(&node_id)
                 .with_context(|| format!("Reading public key of {:?}", node_id))?,
             PeerAddr::new(
                 addr!(format!("{}:{}", node.ip, node.port).as_str()),
