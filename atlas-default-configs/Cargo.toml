@@ -17,5 +17,5 @@ atlas-comm-mio = { path = "../../Atlas-Comm-MIO" }
 atlas-metrics = { path = "../../Atlas-Metrics" }
 rustls = "0"
 rustls-pemfile = "2"
-config = "0.15.7"
+config = "0"
 regex = "*"
