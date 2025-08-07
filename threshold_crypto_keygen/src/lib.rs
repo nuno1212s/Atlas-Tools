@@ -1,18 +1,24 @@
-use atlas_common::crypto::threshold_crypto::{PrivateKeyPart, PrivateKeySet, PublicKeyPart, PublicKeySet, SerializableKeyPart};
+use atlas_common::crypto::threshold_crypto::{
+    PrivateKeyPart, PrivateKeySet, PublicKeyPart, PublicKeySet, SerializableKeyPart,
+};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command (author = "Nuno Neto", version, about = "A key generation utility to facilitate the generation of threshold cryptography key sets")]
+#[command(
+    author = "Nuno Neto",
+    version,
+    about = "A key generation utility to facilitate the generation of threshold cryptography key sets"
+)]
 pub struct ThresholdCryptoGeneratorArgs {
     #[arg(short, long, value_name = "THRESHOLD", default_value_t = 1)]
     threshold: usize,
     #[arg(short, long, value_name = "NODE_COUNT", default_value_t = 4)]
     n: usize,
     #[arg(short, long, value_name = "OUTPUT_DIR", value_hint = clap::ValueHint::DirPath)]
-    destination_dir: PathBuf
+    destination_dir: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -20,14 +26,14 @@ struct SerNodeKeyPair {
     node_index: usize,
     private_key: SerializableKeyPart,
     public_key: PublicKeyPart,
-    public_key_set: PublicKeySet
+    public_key_set: PublicKeySet,
 }
 
 pub struct NodeKeyPair {
     pub node_index: usize,
     pub private_key: PrivateKeyPart,
     pub public_key: PublicKeyPart,
-    pub public_key_set: PublicKeySet
+    pub public_key_set: PublicKeySet,
 }
 
 /// # [Errors]
@@ -54,8 +60,9 @@ pub fn generate_key_set(args: &ThresholdCryptoGeneratorArgs) -> anyhow::Result<(
             }
         })
         .try_for_each(|key_pair| {
-
-            let buf = args.destination_dir.join(format!("node_{}.json", key_pair.node_index));
+            let buf = args
+                .destination_dir
+                .join(format!("node_{}.json", key_pair.node_index));
 
             let open_file = std::fs::File::create(buf)?;
 
@@ -85,7 +92,7 @@ impl From<SerNodeKeyPair> for NodeKeyPair {
             node_index: value.node_index,
             private_key: value.private_key.into(),
             public_key: value.public_key,
-            public_key_set: value.public_key_set
+            public_key_set: value.public_key_set,
         }
     }
 }

@@ -4,8 +4,8 @@ use std::io::{BufReader, Read};
 use std::iter;
 
 use anyhow::Result;
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use rustls_pemfile::{read_one, Item};
 
 use atlas_common::crypto::signature::{KeyPair, PublicKey};
