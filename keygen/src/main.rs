@@ -82,7 +82,7 @@ enum Generator {
         curve: ECDSACurve,
     },
     #[command()]
-    RSA {
+    Rsa {
         #[arg(long)]
         len: RSALength,
         #[arg(long)]
@@ -92,6 +92,7 @@ enum Generator {
     ED25519,
 }
 
+#[allow(dead_code)]
 struct RootCertStore {
     root_cert: Vec<u8>,
     priv_key: Vec<u8>,
@@ -120,7 +121,7 @@ fn main() {
 
     let mut pool = scoped_threadpool::Pool::new(config.work_threads as u32);
 
-    println!("Running script with {:#?}", config);
+    println!("Running script with {config:#?}");
 
     pool.scoped(|scope| {
         let config = &config;
@@ -132,7 +133,7 @@ fn main() {
             scope.execute(move || {
                 generate_keys_for(
                     config,
-                    config.output_dir.join(format!("{:?}/", replica_id)),
+                    config.output_dir.join(format!("{replica_id:?}/")),
                     replica_id,
                     root_store,
                 )
@@ -145,7 +146,7 @@ fn main() {
             scope.execute(move || {
                 generate_keys_for(
                     config,
-                    config.output_dir.join(format!("{:?}/", client_id)),
+                    config.output_dir.join(format!("{client_id:?}/")),
                     client_id,
                     root_store,
                 )
@@ -205,7 +206,7 @@ fn generate_keypair(config: &KeyGenConfig) -> GeneratedKeyPair {
             generators::ecdsa::generate_ecdsa(curve).expect("Failed to generate ecdsa keys")
         }
         Generator::ED25519 => generators::ed25519::generate_ed25519().expect("generate ed"),
-        Generator::RSA { len, .. } => generators::rsa::generate_rsa(len).expect("generate rsa"),
+        Generator::Rsa { len, .. } => generators::rsa::generate_rsa(len).expect("generate rsa"),
     }
 }
 
@@ -232,9 +233,9 @@ fn generate_keys_for(
         public_pcks,
         cert,
     } = match &config.generator {
-        Generator::Ecdsa { curve } => key_names("ecdsa", &format!("{:?}", curve)),
+        Generator::Ecdsa { curve } => key_names("ecdsa", &format!("{curve:?}")),
         Generator::ED25519 => key_names("ed", "25519"),
-        Generator::RSA { len, .. } => key_names("rsa", &format!("{:?}", len)),
+        Generator::Rsa { len, .. } => key_names("rsa", &format!("{len:?}")),
     };
 
     let GeneratedKeyPair {
@@ -308,8 +309,8 @@ pub(crate) fn generate_x509(
                 ECDSACurve::P256 => builder.sign(&root_pkey, MessageDigest::sha3_256())?,
                 ECDSACurve::P384 => builder.sign(&root_pkey, MessageDigest::sha3_384())?,
             },
-            Generator::ED25519 { .. } => builder.sign(&root_pkey, MessageDigest::null())?,
-            Generator::RSA { hash, .. } => match hash {
+            Generator::ED25519 => builder.sign(&root_pkey, MessageDigest::null())?,
+            Generator::Rsa { hash, .. } => match hash {
                 RSAHash::SHA256 => builder.sign(&root_pkey, MessageDigest::sha3_256())?,
                 RSAHash::SHA384 => builder.sign(&root_pkey, MessageDigest::sha3_384())?,
                 RSAHash::SHA512 => builder.sign(&root_pkey, MessageDigest::sha3_512())?,
@@ -357,8 +358,8 @@ pub(crate) fn generate_x509(
                 ECDSACurve::P256 => builder.sign(&private_key, MessageDigest::sha3_256())?,
                 ECDSACurve::P384 => builder.sign(&private_key, MessageDigest::sha3_384())?,
             },
-            Generator::ED25519 { .. } => builder.sign(&private_key, MessageDigest::null())?,
-            Generator::RSA { hash, .. } => match hash {
+            Generator::ED25519 => builder.sign(&private_key, MessageDigest::null())?,
+            Generator::Rsa { hash, .. } => match hash {
                 RSAHash::SHA256 => builder.sign(&private_key, MessageDigest::sha3_256())?,
                 RSAHash::SHA384 => builder.sign(&private_key, MessageDigest::sha3_384())?,
                 RSAHash::SHA512 => builder.sign(&private_key, MessageDigest::sha3_512())?,
