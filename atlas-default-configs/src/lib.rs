@@ -28,17 +28,54 @@ pub mod influx_db_settings;
 pub mod runtime_settings;
 pub mod settings;
 
+/// Resolve a `"host:port"` string to a [`std::net::SocketAddr`], retrying with
+/// exponential backoff on transient DNS failures.
+///
+/// Starts at [`DNS_RETRY_INITIAL_BACKOFF_MS`] ms and doubles each attempt, capped
+/// at [`DNS_RETRY_MAX_BACKOFF_MS`] ms. Panics after [`DNS_RETRY_MAX_ATTEMPTS`]
+/// consecutive failures.
+pub const DNS_RETRY_MAX_ATTEMPTS: u32 = 10;
+pub const DNS_RETRY_INITIAL_BACKOFF_MS: u64 = 200;
+pub const DNS_RETRY_MAX_BACKOFF_MS: u64 = 5_000;
+
+pub fn resolve_addr(addr: &str) -> std::net::SocketAddr {
+    for attempt in 0..DNS_RETRY_MAX_ATTEMPTS {
+        match std::net::ToSocketAddrs::to_socket_addrs(addr) {
+            Ok(mut iter) => {
+                if let Some(socket_addr) = iter.next() {
+                    return socket_addr;
+                }
+                panic!("Resolved domain '{}' has no corresponding IPs", addr);
+            }
+            Err(e) => {
+                if attempt + 1 >= DNS_RETRY_MAX_ATTEMPTS {
+                    panic!(
+                        "Unable to resolve domain '{}' after {} attempts: {}",
+                        addr, DNS_RETRY_MAX_ATTEMPTS, e
+                    );
+                }
+                let backoff_ms = (DNS_RETRY_INITIAL_BACKOFF_MS * (1u64 << attempt))
+                    .min(DNS_RETRY_MAX_BACKOFF_MS);
+                eprintln!(
+                    "[atlas-config] DNS resolution failed for '{}' (attempt {}/{}): {}. \
+                     Retrying in {}ms...",
+                    addr,
+                    attempt + 1,
+                    DNS_RETRY_MAX_ATTEMPTS,
+                    e,
+                    backoff_ms
+                );
+                std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
+            }
+        }
+    }
+    unreachable!()
+}
+
 #[macro_export]
 macro_rules! addr {
     ($a:expr) => {{
-        let server: Vec<_> = ::std::net::ToSocketAddrs::to_socket_addrs($a)
-            .expect("Unable to resolve domain")
-            .collect();
-
-        server
-            .into_iter()
-            .next()
-            .expect("Resolved domain has no corresponding IPs?")
+        $crate::resolve_addr($a)
     }};
 }
 
