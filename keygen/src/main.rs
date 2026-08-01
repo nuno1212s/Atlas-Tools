@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use openssl::asn1::Asn1Time;
 use openssl::hash::MessageDigest;
 use openssl::pkey::PKey;
-use openssl::x509::{X509Builder, X509NameBuilder, X509};
+use openssl::x509::{X509, X509Builder, X509NameBuilder};
 
 use crate::generators::ecdsa::ECDSACurve;
 use crate::generators::rsa::{RSAHash, RSALength};
